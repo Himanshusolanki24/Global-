@@ -1,0 +1,28 @@
+# dependencies
+node_modules/
+
+# build output
+dist/
+*.tsbuildinfo
+
+# env (VITE_API_URL etc.)
+.env
+.env.*
+!.env.example
+
+# logs
+*.log
+npm-debug.log*
+
+# editor / OS
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# python backend (FastAPI + SQLite)
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.sqlite3-journal
