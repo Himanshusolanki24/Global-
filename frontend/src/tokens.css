@@ -1,0 +1,70 @@
+/* RightSize design tokens. Every colour, face, size, radius, easing and duration lives here. */
+:root {
+  /* colour: paper and ink, one signal, one warning, two model families */
+  --paper: #f2f0ea;
+  --ink: #16181a;
+  --graphite: #5b5f63;
+  --signal: #d8ff3e;
+  --warn: #ff5a1f;
+  --small: #2f6f5e;
+  --big: #1f3a8a;
+  --paper-2: color-mix(in srgb, var(--ink) 4%, var(--paper)); /* recessed instrument well */
+  --grid: color-mix(in srgb, var(--ink) 6%, transparent); /* graph-paper hairline */
+  --rule: color-mix(in srgb, var(--graphite) 35%, transparent);
+  --gridline: color-mix(in srgb, var(--graphite) 12%, transparent);
+  --thermal: #fbfaf6; /* receipt paper, stays light in both themes */
+
+  /* type */
+  --f-display: 'Bricolage Grotesque', 'IBM Plex Sans', sans-serif;
+  --f-ui: 'IBM Plex Sans', system-ui, sans-serif;
+  --f-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --f-deva-display: 'Tiro Devanagari Hindi', serif;
+  --f-deva-ui: 'Mukta', sans-serif;
+  --deva-scale: 1.12; /* Devanagari runs small at the same em; this matches x-height to Latin */
+
+  /* type scale: perfect fourth (1.333) on a 16px root */
+  --t-xs: 0.75rem;
+  --t-sm: 0.875rem;
+  --t-md: 1rem;
+  --t-lg: 1.333rem;
+  --t-xl: 1.777rem;
+  --t-2xl: 2.369rem;
+  --t-3xl: 3.157rem;
+  --t-hero: clamp(3.5rem, 11vw, 10.5rem);
+
+  /* space: 4px base, 24px baseline for the graph-paper grid */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-6: 24px;
+  --s-8: 32px;
+  --s-12: 48px;
+  --s-16: 64px;
+  --baseline: 24px;
+  --gutter: clamp(16px, 3vw, 40px);
+
+  /* radius: mixed on purpose */
+  --r-instrument: 0;
+  --r-input: 2px;
+  --r-disc: 50%;
+
+  /* motion */
+  --ease-instrument: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-mechanical: steps(6, end);
+  --dur-micro: 120ms;
+  --dur-readout: 280ms;
+  --dur-panel: 480ms;
+  --dur-signature: 1100ms;
+  --line-feed: 70ms; /* receipt: one printed line every 70ms */
+  --digit-stagger: 30ms; /* odometer: right-to-left */
+}
+
+/* bench lights off: paper and ink swap, signal and warn stay identical */
+:root[data-theme='dark'] {
+  --paper: #16181a;
+  --ink: #f2f0ea;
+  --graphite: #a2a6aa;
+  --small: #5fb39a;
+  --big: #8ea3e6;
+}
