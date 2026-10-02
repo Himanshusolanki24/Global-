@@ -25,14 +25,15 @@ ENCODER = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"  # cover
 SEED = 412
 
 
-def queries_for(split_name: str, keyed: dict, pred: dict, conf: dict, spec, order: list[str], text: dict) -> list[RouterQuery]:  # noqa: ANN001
+def queries_for(split_name: str, keyed: dict, pred: dict, conf: dict, spec, bigs: list[str], order: list[str],  # noqa: ANN001
+                text: dict) -> list[RouterQuery]:
     out = []
     for (task, item), ok in sorted(keyed.items()):
-        if split(item) != split_name or (task, item) not in conf or spec.small not in ok or any(b not in ok for b in spec.bigs):
+        if split(item) != split_name or (task, item) not in conf or spec.small not in ok or any(b not in ok for b in bigs):
             continue
         out.append(RouterQuery(
             id=f"Q-{len(out) + 1:03d}", item_id=item, task=task, lang=text[(task, item)][1], text=text[(task, item)][0],
-            conf=round(conf[(task, item)], 3), pred_small=pred[(task, item)], small_ok=ok[spec.small], big_ok=ok[spec.bigs[0]],
+            conf=round(conf[(task, item)], 3), pred_small=pred[(task, item)], small_ok=ok[spec.small], big_ok=ok[bigs[0]],
             ok=ok, smallest_ok=smallest_ok(ok, order),
         ))
     return out
@@ -60,6 +61,12 @@ def main(argv: list[str] | None = None) -> None:
     keyed = {k: v for k, v in verdicts(rows).items() if spec.small in v}
     if not keyed:
         raise SystemExit(f"router: no benchmark rows for the small model {spec.small} — run the harness first")
+    # A big model that never ran (e.g. an API that was rate-limited or skipped) is left out, not faked.
+    bigs = [b for b in spec.bigs if any(b in v for v in keyed.values())]
+    if not bigs:
+        raise SystemExit(f"router: none of the big models {spec.bigs} has benchmark rows")
+    for b in set(spec.bigs) - set(bigs):
+        print(f"router: skipping big model {b}: no benchmark rows")
     conf_calls: dict[tuple[str, str], list[RunRecord]] = {}
     for r in rows:
         if r.kind == "conf" and r.config_id == spec.small and r.error is None:
@@ -78,8 +85,8 @@ def main(argv: list[str] | None = None) -> None:
     clf = LogisticRegression(max_iter=2000, class_weight="balanced", random_state=SEED).fit(X[tr], [y[i] for i in tr])
     pred = dict(zip(keys, (bool(p) for p in clf.predict(X))))
 
-    val = queries_for("val", keyed, pred, conf, spec, order, text)
-    test = queries_for("test", keyed, pred, conf, spec, order, text)
+    val = queries_for("val", keyed, pred, conf, spec, bigs, order, text)
+    test = queries_for("test", keyed, pred, conf, spec, bigs, order, text)
     heldout = sum(q.pred_small == q.small_ok for q in test) / max(len(test), 1)
     print(f"router: classifier held-out accuracy {100 * heldout:.1f}% on {len(test)} test items")
 
@@ -90,7 +97,7 @@ def main(argv: list[str] | None = None) -> None:
     calls = {(r.kind, r.config_id, r.item_id, r.repeat_index): r for r in rows if r.error is None}
 
     variants, replay = [], []
-    for big in spec.bigs:
+    for big in bigs:
         tau = tune_tau(val, by_task(spec.small), by_task(big), spec.samples, big)
         variants.append({"big": big, "tau": tau})
         print(f"router: τ = {tau:.2f} for big = {big}")
