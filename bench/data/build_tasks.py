@@ -25,20 +25,32 @@ SEED = 412
 DOC_CHARS = 2500  # keeps summarise prompts inside every model's context and the API bill bounded
 
 
+def _hub_urls(dataset: str, config: str, split: str, headers: dict) -> list[str]:
+    """Parquet files straight from the dataset repo (<config>/<split>-*.parquet), for datasets the
+    viewer does not serve, such as gated MILU."""
+    r = requests.get(f"https://huggingface.co/api/datasets/{dataset}/tree/main/{config}", headers=headers, timeout=60)
+    r.raise_for_status()
+    return [f"https://huggingface.co/datasets/{dataset}/resolve/main/{f['path']}" for f in r.json()
+            if f["path"].rsplit("/", 1)[-1].startswith(f"{split}-") and f["path"].endswith(".parquet")]
+
+
 def parquet(dataset: str, config: str, split: str) -> pd.DataFrame:
     tok = os.environ.get("HF_TOKEN")
     headers = {"Authorization": f"Bearer {tok}"} if tok else {}
     r = requests.get("https://datasets-server.huggingface.co/parquet", params={"dataset": dataset, "config": config},
                      headers=headers, timeout=60)
-    if r.status_code in (401, 403, 404) and not tok:
-        raise SystemExit(f"{dataset} is gated: accept its terms on huggingface.co and set HF_TOKEN")
-    r.raise_for_status()
-    urls = [f["url"] for f in r.json()["parquet_files"] if f["split"] == split]
+    if r.ok:
+        urls = [f["url"] for f in r.json()["parquet_files"] if f["split"] == split]
+    else:
+        urls = _hub_urls(dataset, config, split, headers)
     if not urls:
-        raise SystemExit(f"{dataset}/{config} has no '{split}' split")
+        raise SystemExit(f"{dataset}/{config} has no '{split}' parquet files")
     frames = []
     for u in urls:
         b = requests.get(u, headers=headers, timeout=300)
+        if b.status_code in (401, 403):
+            raise SystemExit(f"{dataset} is gated: open huggingface.co/datasets/{dataset}, click 'Agree and access', "
+                             f"and make sure the HF_TOKEN secret is attached (HTTP {b.status_code})")
         b.raise_for_status()
         frames.append(pd.read_parquet(io.BytesIO(b.content)))
     return pd.concat(frames, ignore_index=True)
