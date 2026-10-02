@@ -107,6 +107,37 @@ Configurations must be ordered smallest to largest, because the size dial follow
 
 ---
 
+## Running the benchmark (Kaggle, nothing on your laptop)
+
+All compute runs in one Kaggle notebook, `notebook/rightsize_bench.ipynb`. Its only outputs are `results.json` and `replay.json`.
+
+1. **New notebook** on kaggle.com → File → Import → `notebook/rightsize_bench.ipynb` from this repo.
+2. **Settings:** Accelerator **GPU T4 x2**, Internet **on**. (Two GPUs let Llama 3.1 8B FP16 sit fully in VRAM, and energy is read from both.)
+3. **Secrets** (Add-ons → Secrets): `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `HF_TOKEN`. Accept the [MILU](https://huggingface.co/datasets/ai4bharat/MILU) terms first; it is gated.
+4. **Save Version → Save & Run All.** The cells run in order:
+
+| Cell | Does |
+|---|---|
+| 1 Ollama | installs Ollama natively, starts it with `OLLAMA_MAX_LOADED_MODELS=1` |
+| 2 Code | clones this repo, `pip install -r requirements.txt`, picks up a previous DB if attached |
+| 3 Tasks | builds the 6 × 200-item task bank (seeded) and checks every Ollama tag on the registry |
+| 4 Host | GPU/CPU fingerprint + 60 s idle baseline |
+| 5 Smoke | 3 items × 1 local + 1 API model; stops the notebook if any call errors |
+| 6 Bench | the full run; every call is committed, so it resumes |
+| 7 Conf | router confidence samples (small model, temperature 0.7, × 3) |
+| 8 Router + export | trains the router, writes `results.json` and `replay.json` |
+
+5. **A run takes longer than one 12-hour session.** The harness stops cleanly before the limit. When the version finishes, open a new version, **Add Input → Your Work → this notebook's output**, and Save & Run All again. Finished calls are skipped.
+6. Download `results.json` and `replay.json` from the Output tab and commit them to `frontend/public/`.
+
+Locally (or in Codespaces), `python -m bench.export --fixtures` writes **sample** files with the real shape, and `pytest` runs the checks.
+
+### Deploying the site (Vercel)
+
+Import the repo on vercel.com, set **Root Directory** to `frontend`, keep the Vite preset (`npm run build` → `dist`). Every commit of new `results.json` redeploys it. No backend, no environment variables.
+
+---
+
 ## Project structure
 
 ```
