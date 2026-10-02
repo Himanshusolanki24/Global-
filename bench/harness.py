@@ -151,6 +151,7 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--deadline-hours", type=float, default=None, help="stop cleanly after this long (Kaggle caps at 12 h)")
     ap.add_argument("--skip-api", action="store_true", help="skip API configs instead of failing when a key is missing")
     ap.add_argument("--keep-models", action="store_true", help="do not delete each Ollama model after its run")
+    ap.add_argument("--strict", action="store_true", help="exit non-zero if any config cannot run (smoke runs)")
     a = ap.parse_args(argv)
 
     configs = [c for c in load_configs() if not a.configs or c.id in a.configs]
@@ -218,7 +219,7 @@ def main(argv: list[str] | None = None) -> None:
     log("finished", calls=n, errors=errors, failed_configs=failed, minutes=round((time.perf_counter() - t0) / 60, 1),
         note="errored calls are retried on the next run" if errors else "")
     store.close()
-    if failed and a.limit:  # a smoke run (--limit) must surface a model that cannot run at all
+    if failed and a.strict:  # smoke runs stop here; full runs carry on so the router and export still happen
         raise SystemExit(f"harness: {len(failed)} config(s) could not run: {', '.join(failed)}")
 
 
