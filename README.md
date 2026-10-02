@@ -6,7 +6,7 @@ RightSize benchmarks 17 model configurations (5 small open models at FP16, Q8 an
 
 It is built for Indian college labs, startups and government teams who need to choose a model with evidence, not vibes.
 
-> **Heads up:** the front end ships with **sample data, not results**. A striped banner stays on screen until a real run is loaded from the backend.
+> The site shows **measured results** from run `RUN-20261002-2218-c492` (6 models × 6 tasks × 30 questions on 2× Tesla T4). If `results.json` is ever replaced by the `--fixtures` sample, a striped banner says so.
 
 ---
 
@@ -69,39 +69,10 @@ npm run dev          # http://localhost:5173
 | `npm run build` | Type-check and build to `frontend/dist/` |
 | `npm run preview` | Serve the production build |
 | `npm run check` | Self-check for the Pareto, cost-of-quality and routing maths |
-| `npm run mock` | Regenerate the sample data in `mock/results.json` |
 
-### Connecting the backend
+### Where the data comes from
 
-The front end reads one JSON payload. Point it at the FastAPI backend with an env var:
-
-```bash
-# frontend/.env
-VITE_API_URL=http://localhost:8000
-```
-
-It then calls `GET {VITE_API_URL}/results`. If the variable is unset, or the backend is unreachable, the app falls back to the bundled sample data and keeps the sample banner visible.
-
-**Payload shape** (`mock/gen.mjs` is the reference implementation):
-
-```jsonc
-{
-  "sample": false,
-  "run": { "id": "RUN-0412", "hardware": "RTX 3090 24 GB + Ryzen 7 5800X", "boundary": "GPU+CPU+RAM",
-           "grid_g_per_wh": 0.716, "grid_source": "CEA CO₂ Baseline Database",
-           "tariff_inr_per_kwh": 8.5, "n_per_cell": 500, "measured_at": "2026-09-18T14:22:00+05:30" },
-  "tasks": ["classify", "extract", "summarise", "qa", "math", "hindi_qa"],
-  "configs": [{ "id": "phi3.5-mini/Q4", "model": "phi3.5-mini", "name": "Phi-3.5 mini",
-                "params_b": 3.8, "quant": "Q4", "kind": "small", "mem_gb": 2.3, "estimated": false }],
-  "results": [{ "config": "phi3.5-mini/Q4", "task": "qa", "lang": "en",
-                "acc": 66.6, "acc_ci": [62.3, 71.1], "ttft_p95_ms": 55,
-                "wh_q": 0.0727, "wh_ci": [0.0676, 0.0778], "mwh_tok": 0.808,
-                "inr_1k": 2.21, "co2_g_1k": 52.1 }],
-  "router": { "small": "phi3.5-mini/Q4", "big": "mistral-small/API", "samples": 3,
-              "queries": [{ "id": "Q-001", "task": "classify", "text": "…", "conf": 0.667,
-                            "small_ok": true, "big_ok": true }] }
-}
-```
+The site is static. It fetches `frontend/public/results.json`, produced by `bench/export.py` at the end of the Kaggle run, and validates it with zod (`src/data.ts` mirrors `bench/core/schemas.py`). A missing or malformed file shows a visible error, never invented numbers. For sample data with the real shape, run `python -m bench.export --fixtures`.
 
 Configurations must be ordered smallest to largest, because the size dial follows that order.
 
@@ -143,9 +114,6 @@ Import the repo on vercel.com, set **Root Directory** to `frontend`, keep the Vi
 ```
 frontend/
 ├── index.html              fonts: Bricolage Grotesque, IBM Plex Sans, JetBrains Mono, Tiro Devanagari Hindi, Mukta
-├── mock/
-│   ├── gen.mjs             sample data generator (seeded, reproducible)
-│   └── results.json        SAMPLE data, not results
 └── src/
     ├── tokens.css          design tokens: colour, type, spacing, radii, easing, durations
     ├── app.css             all component styles, dark theme, print, reduced motion
