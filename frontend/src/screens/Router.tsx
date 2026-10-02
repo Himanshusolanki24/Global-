@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useReducedMotion } from 'framer-motion';
 import type { ScreenProps } from '../App';
-import { cell, fmt, shortName, TASKS, type Query } from '../data';
-import { route } from '../metrics';
+import { cell, fmt, shortName, type Query } from '../data';
+import { route, routesSmall } from '../metrics';
 import { H, Odometer } from '../ui';
 
 const STUB_W = 150, SPEED = 280, G = 2200, GATE_HOLD = 0.35, TRAY_KEEP = 9;
@@ -11,13 +11,13 @@ type Done = { q: Query; key: number; small: boolean };
 
 const confLabel = (c: number) => (c > 0.9 ? '3/3' : c > 0.5 ? '2/3' : '1/3');
 
-export default function Router({ bench, lang, task }: ScreenProps) {
+export default function Router({ bench, lang }: ScreenProps) {
   const { queries, samples } = bench.router;
-  const small = cell(bench, bench.router.small, task, lang), big = cell(bench, bench.router.big, task, lang);
+  const small = (t: string) => cell(bench, bench.router.small, t, lang), big = (t: string) => cell(bench, bench.router.big, t, lang);
   const smallC = bench.configs.find((c) => c.id === bench.router.small)!, bigC = bench.configs.find((c) => c.id === bench.router.big)!;
   const reduced = useReducedMotion();
 
-  const [tau, setTau] = useState(0.6);
+  const [tau, setTau] = useState(bench.router.tau); // the τ tuned on the validation split
   const [paused, setPaused] = useState(false);
   const [done, setDone] = useState<Done[]>([]);
   const [flights, setFlights] = useState<Flight[]>([]);
@@ -34,7 +34,7 @@ export default function Router({ bench, lang, task }: ScreenProps) {
   useEffect(() => {
     fl.current = [];
     setFlights([]);
-    setDone(reduced ? queries.map((q, k) => ({ q, key: k, small: q.conf >= tau })) : []);
+    setDone(reduced ? queries.map((q, k) => ({ q, key: k, small: routesSmall(q, tau) })) : []);
   }, [tau, reduced, queries]);
 
   useEffect(() => {
@@ -65,7 +65,7 @@ export default function Router({ bench, lang, task }: ScreenProps) {
         } else if (f.phase === 'gate') {
           f.t += dt;
           if (f.t >= GATE_HOLD) {
-            f.small = f.q.conf >= tauRef.current;
+            f.small = routesSmall(f.q, tauRef.current);
             f.phase = 'drop';
             f.vx = 90;
             f.vy = f.small ? 0 : -120;
@@ -96,7 +96,9 @@ export default function Router({ bench, lang, task }: ScreenProps) {
   }, [reduced, paused, queries]);
 
   const live = route(done.map((d) => d.q), tau, small, big, samples);
-  const full = useMemo(() => route(queries, tau, small, big, samples), [queries, tau, small, big, samples]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- small/big are lookups over bench + lang
+  const full = useMemo(() => route(queries, tau, small, big, samples), [queries, tau, samples, bench, lang]);
+  const signed = (x: number, d: number) => (x < 0 ? '-' : '') + Math.abs(x).toFixed(d);
   const allBig = (100 * queries.filter((q) => q.big_ok).length) / queries.length;
   const trays = { small: done.filter((d) => d.small).slice(-TRAY_KEEP), big: done.filter((d) => !d.small).slice(-TRAY_KEEP) };
 
@@ -104,7 +106,8 @@ export default function Router({ bench, lang, task }: ScreenProps) {
     <div className="screen">
       <div className="screen-head">
         <H k="routerH" lang={lang} className="h-section" />
-        <p className="formula mono">route = small if conf ≥ τ, else big · conf = agreement of {samples} samples from {shortName(smallC)}</p>
+        <p className="formula mono">route = small if classifier says small and conf ≥ τ, else big · conf = agreement of {samples} samples (T={bench.router.conf_temperature}) from {shortName(smallC)}</p>
+        <p className="small graphite">Classifier: {bench.router.classifier.encoder.split('/').pop()} embeddings, {fmt.pct(bench.router.classifier.heldout_acc)} held-out accuracy on {bench.router.classifier.n_test} test queries.</p>
       </div>
 
       <div className="router-controls">
@@ -128,9 +131,9 @@ export default function Router({ bench, lang, task }: ScreenProps) {
           <div className="gate">
             <div className="gate-meter">
               <span className="gate-tau" style={{ left: `${tau * 100}%` }} />
-              {atGate && <span className={`gate-conf ${atGate.conf >= tau ? '' : 'gate-conf-low'}`} style={{ left: `${atGate.conf * 100}%` }} />}
+              {atGate && <span className={`gate-conf ${routesSmall(atGate, tau) ? '' : 'gate-conf-low'}`} style={{ left: `${atGate.conf * 100}%` }} />}
             </div>
-            <span className="mono small">{atGate ? `${atGate.id} conf ${confLabel(atGate.conf)} ${atGate.conf >= tau ? '≥' : '<'} τ` : 'gate idle'}</span>
+            <span className="mono small">{!atGate ? 'gate idle' : !atGate.pred_small ? `${atGate.id} classifier → big` : `${atGate.id} conf ${confLabel(atGate.conf)} ${atGate.conf >= tau ? '≥' : '<'} τ`}</span>
           </div>
           {flights.map((f) => (
             <div key={f.key} ref={(el) => void (el ? els.current.set(f.key, el) : els.current.delete(f.key))} className="stub-fly" style={{ transform: `translate3d(${f.x}px, ${f.y}px, 0)` }}>
@@ -147,12 +150,12 @@ export default function Router({ bench, lang, task }: ScreenProps) {
 
       <div className="tally" aria-live="polite">
         <div><span className="inst-label">Routed small</span><Odometer value={live.pctSmall.toFixed(0).padStart(3, '0')} className="big-read" /><span className="unit">%</span></div>
-        <div><span className="inst-label">₹ saved per 1k vs always-big</span><span className="big-read">₹</span><Odometer value={Math.max(0, live.n ? live.inrSaved1k : 0).toFixed(1).padStart(5, '0')} className="big-read" /></div>
-        <div><span className="inst-label">Wh saved per 1k (est.)</span><Odometer value={Math.max(0, live.n ? live.whSaved1k : 0).toFixed(0).padStart(4, '0')} className="big-read" /></div>
+        <div><span className="inst-label">₹ saved per 1k vs always-big</span><span className="big-read">₹</span><Odometer value={signed(live.n ? live.inrSaved1k : 0, 2)} className="big-read" /></div>
+        <div><span className="inst-label">Wh saved per 1k{bigC.estimated ? ' (est.)' : ''}</span><Odometer value={signed(live.n ? live.whSaved1k : 0, 1)} className="big-read" /></div>
         <div><span className="inst-label">Accuracy, routed</span><Odometer value={(live.n ? live.acc : 0).toFixed(1).padStart(4, '0')} className="big-read" /><span className="unit">%</span></div>
       </div>
       <p className="small graphite tally-note">
-        Live tally over {live.n} stubs. Full sample of {queries.length} at τ {tau.toFixed(2)}: {full.pctSmall.toFixed(0)}% small, accuracy {fmt.pct(full.acc)} against {fmt.pct(allBig)} always-big, {fmt.inr(full.inrSaved1k)} saved per 1k. Priced at {TASKS[task]} rates; escalations also pay for the {samples} small samples.
+        Live tally over {live.n} stubs. Full sample of {queries.length} at τ {tau.toFixed(2)}: {full.pctSmall.toFixed(0)}% small, accuracy {fmt.pct(full.acc)} against {fmt.pct(allBig)} always-big, {full.inrSaved1k >= 0 ? `${fmt.inr(full.inrSaved1k)} saved` : `${fmt.inr(-full.inrSaved1k)} extra`} and {full.whSaved1k >= 0 ? `${fmt.wh(full.whSaved1k)} Wh saved` : `${fmt.wh(-full.whSaved1k)} Wh extra`} per 1k. Each query is priced at its own task's measured rates; every small-first query also pays for the {samples} confidence samples. A negative saving means routing costs more than always using {shortName(bigC)}.
       </p>
     </div>
   );

@@ -14,10 +14,14 @@ assert.equal(c.whPerPt, 50);
 assert.ok(c.significant);
 assert.ok(!costOfQuality(small, { ...small, acc: 62, acc_ci: [58, 66] }).significant);
 
-const qs = [{ conf: 1, small_ok: true, big_ok: true }, { conf: 1 / 3, small_ok: false, big_ok: true }];
-const r = route(qs, 0.5, small, big, 3);
-assert.equal(r.pctSmall, 50);
-assert.equal(r.acc, 100);
-assert.equal(+r.inrSaved1k.toFixed(6), 202 - (6 + 6 + 202) / 2); // 3 small samples always paid
-assert.equal(route(qs, 0, small, big, 3).pctSmall, 100);
+const qs = [
+  { task: 'qa', conf: 1, pred_small: true, small_ok: true, big_ok: true },
+  { task: 'qa', conf: 1 / 3, pred_small: true, small_ok: false, big_ok: true },
+  { task: 'qa', conf: 1, pred_small: false, small_ok: true, big_ok: true },
+];
+const r = route(qs, 0.5, () => small, () => big, 3);
+assert.equal(+r.pctSmall.toFixed(6), +(100 / 3).toFixed(6));
+assert.equal(r.acc, 100); // the escalated query is answered by big
+assert.equal(+r.inrSaved1k.toFixed(6), +(202 - (6 + (6 + 202) + 202) / 3).toFixed(6)); // same numbers as simulate.py
+assert.equal(route(qs, 0, () => small, () => big, 3).pctSmall, 200 / 3); // classifier-big queries never go small
 console.log('metrics ok');

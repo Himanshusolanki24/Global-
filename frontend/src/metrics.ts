@@ -27,24 +27,30 @@ export function costOfQuality<T extends Cell>(a: T, b: T) {
   };
 }
 
-export type Query = { conf: number; small_ok: boolean; big_ok: boolean };
+export type Query = { task: string; conf: number; pred_small: boolean; small_ok: boolean; big_ok: boolean };
 
-/** Route small if conf ≥ τ else big. The small model always runs `samples` times to measure conf. */
-export function route(qs: Query[], tau: number, small: Cell, big: Cell, samples: number) {
-  let nSmall = 0, ok = 0, inr = 0, wh = 0;
+/** Same rule as bench/router/simulate.py: small only if the classifier says small AND conf ≥ τ. */
+export const routesSmall = (q: Query, tau: number) => q.pred_small && q.conf >= tau;
+
+/** Classifier says big → big only. Says small → small runs `samples` times for conf; escalate if conf < τ.
+ *  Each query is priced at its own task's rates, against always sending everything to big. */
+export function route(qs: Query[], tau: number, small: (task: string) => Cell, big: (task: string) => Cell, samples: number) {
+  let nSmall = 0, ok = 0, inr = 0, wh = 0, bigInr = 0, bigWh = 0;
   for (const q of qs) {
-    const s = q.conf >= tau;
+    const s = routesSmall(q, tau), sm = small(q.task), bg = big(q.task);
     nSmall += +s;
     ok += +(s ? q.small_ok : q.big_ok);
-    inr += (small.inr_1k * samples + (s ? 0 : big.inr_1k)) / 1000;
-    wh += small.wh_q * samples + (s ? 0 : big.wh_q);
+    if (q.pred_small) (inr += (sm.inr_1k * samples) / 1000), (wh += sm.wh_q * samples);
+    if (!s) (inr += bg.inr_1k / 1000), (wh += bg.wh_q);
+    bigInr += bg.inr_1k / 1000;
+    bigWh += bg.wh_q;
   }
   const n = qs.length || 1;
   return {
     n: qs.length,
     pctSmall: (100 * nSmall) / n,
     acc: (100 * ok) / n,
-    inrSaved1k: big.inr_1k - (inr / n) * 1000,
-    whSaved1k: (big.wh_q - wh / n) * 1000,
+    inrSaved1k: ((bigInr - inr) / n) * 1000, // negative = routing costs more than always-big
+    whSaved1k: ((bigWh - wh) / n) * 1000,
   };
 }
