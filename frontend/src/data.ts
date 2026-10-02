@@ -1,32 +1,64 @@
-import type { Cell } from './metrics.ts';
+import { z } from 'zod';
 
-export type Bench = typeof import('../mock/results.json');
+// Mirrors bench/core/schemas.py (only the fields the UI reads). A mismatch fails loudly: no fake data.
+const CI = z.tuple([z.number(), z.number()]);
+const Schema = z.object({
+  schema_version: z.string(),
+  sample: z.boolean(),
+  run: z.object({
+    id: z.string(), hardware: z.string(), boundary: z.string(), grid_g_per_wh: z.number(), grid_source: z.string(),
+    tariff_inr_per_kwh: z.number(), n_per_cell: z.number(), repeats: z.number(), measured_at: z.string(),
+    host: z.object({ gpu: z.string(), idle_w: z.number(), idle_w_std: z.number(), idle_s: z.number() }),
+  }),
+  tasks: z.array(z.string()),
+  task_meta: z.array(z.object({ id: z.string(), name: z.string(), lang: z.enum(['en', 'hi']), n_items: z.number().nullable() })),
+  configs: z.array(z.object({
+    id: z.string(), model: z.string(), name: z.string(), params_b: z.number().nullable(),
+    quant: z.enum(['Q4', 'Q8', 'FP16', 'API']), kind: z.enum(['small', 'big']), mem_gb: z.number().nullable(), estimated: z.boolean(),
+  })),
+  // ponytail: energy fields are required, so an API config (wh_q null) fails validation; make them nullable
+  // and render "not measurable" with energy_reason when a cloud model is added back.
+  results: z.array(z.object({
+    config: z.string(), task: z.string(), lang: z.enum(['en', 'hi']), n_items: z.number(),
+    acc: z.number(), acc_ci: CI, ttft_p95_ms: z.number(), wh_q: z.number(), wh_ci: CI, mwh_tok: z.number(),
+    inr_1k: z.number(), co2_g_1k: z.number(), energy_reason: z.string().nullable(),
+  })),
+  coq: z.array(z.object({ task: z.string(), lo: z.string(), hi: z.string(), d_acc: z.number(), d_acc_ci: CI, significant: z.boolean() })),
+  router: z.object({
+    small: z.string(), big: z.string(), samples: z.number(), tau: z.number(), conf_temperature: z.number(),
+    classifier: z.object({ encoder: z.string(), heldout_acc: z.number(), n_test: z.number() }),
+    queries: z.array(z.object({
+      id: z.string(), task: z.string(), text: z.string(), conf: z.number(), pred_small: z.boolean(),
+      small_ok: z.boolean(), big_ok: z.boolean(), ok: z.record(z.boolean()),
+    })),
+  }),
+});
+
+export type Bench = z.infer<typeof Schema>;
 export type Config = Bench['configs'][number];
-export type Result = Bench['results'][number] & Cell;
+export type Result = Bench['results'][number];
 export type Query = Bench['router']['queries'][number];
 export type Lang = 'en' | 'hi';
 
-const API = import.meta.env.VITE_API_URL as string | undefined;
-
-/** Real runs from FastAPI when VITE_API_URL is set; otherwise the bundled sample (flagged sample: true). */
+/** results.json is produced by the Kaggle run (bench/export.py) and served as a static file. */
 export async function loadBench(): Promise<Bench> {
-  const sample = async () => (await import('../mock/results.json')).default as Bench;
-  if (!API) return sample();
-  try {
-    const r = await fetch(`${API}/results`);
-    if (!r.ok) throw new Error(`GET /results → ${r.status}`);
-    return await r.json();
-  } catch (e) {
-    console.warn('Backend unreachable, showing sample data.', e);
-    return sample();
-  }
+  const r = await fetch(`${import.meta.env.BASE_URL}results.json`);
+  if (!r.ok) throw new Error(`results.json not found (HTTP ${r.status}). Run bench/export.py and commit it to frontend/public/.`);
+  const parsed = Schema.safeParse(await r.json());
+  if (!parsed.success) throw new Error(`results.json does not match the schema: ${parsed.error.issues.slice(0, 3).map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`);
+  return parsed.data;
 }
 
 const index = new WeakMap<Bench, Map<string, Result>>();
+/** Each task is measured in one language; when the requested language has no cell, the task's own one is used. */
 export function cell(b: Bench, config: string, task: string, lang: Lang): Result {
   let m = index.get(b);
-  if (!m) index.set(b, (m = new Map(b.results.map((r) => [`${r.config}|${r.task}|${r.lang}`, r as Result]))));
-  return m.get(`${config}|${task}|${lang}`)!;
+  if (!m) {
+    m = new Map();
+    for (const r of b.results) m.set(`${r.config}|${r.task}|${r.lang}`, r).set(`${r.config}|${r.task}`, r);
+    index.set(b, m);
+  }
+  return m.get(`${config}|${task}|${lang}`) ?? m.get(`${config}|${task}`)!;
 }
 
 export const shortName = (c: Config) => (c.kind === 'big' ? c.name : `${c.name} ${c.quant}`);

@@ -21,8 +21,9 @@ export default function App() {
   const [lang, setLang] = useState<Lang>('en');
   const [task, setTask] = useState('qa');
   const [dark, setDark] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => void loadBench().then(setBench), []);
+  useEffect(() => void loadBench().then(setBench, (e: Error) => setError(e.message)), []);
   useEffect(() => {
     const on = () => setScreen(readHash());
     addEventListener('hashchange', on);
@@ -35,7 +36,7 @@ export default function App() {
     <MotionConfig reducedMotion="user">
       {bench?.sample && (
         <p className="tape" role="note">
-          <span>Sample data, not results. Every number here is invented until a real run is loaded from the API.</span>
+          <span>Sample data, not results. Every number here is invented until a real run's results.json is loaded.</span>
         </p>
       )}
       <header className="bar">
@@ -68,7 +69,7 @@ export default function App() {
         </div>
       </header>
       <main>
-        {!bench ? <Calibrating label="Loading bench" /> : (
+        {error ? <p className="tape" role="alert"><span>Could not load results: {error}</span></p> : !bench ? <Calibrating label="Loading bench" /> : (
           <AnimatePresence mode="wait" initial={false}>
             <motion.section
               key={screen}
