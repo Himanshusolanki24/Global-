@@ -24,11 +24,11 @@ small:
     tags: {Q4: "llama3.1:8b-instruct-q4_K_M", Q8: "llama3.1:8b-instruct-q8_0", FP16: "llama3.1:8b-instruct-fp16"}
 
 big:
-  - {model: mistral-large, name: Mistral Large, backend: mistral, tag: mistral-large-latest}
+  - {model: mistral-small, name: Mistral Small, backend: mistral, tag: mistral-small-latest}   # 24B; on the free tier (Large is not)
   - {model: claude-sonnet, name: Claude Sonnet, backend: anthropic, tag: claude-sonnet-5-5}
 
 router:
   small: phi3.5-mini/Q4
-  bigs: [llama3.1-8b/Q8, mistral-large/API]   # local big ⇒ Wh saved is measured; API big ⇒ ₹ saved is measured
+  bigs: [llama3.1-8b/Q8, mistral-small/API]   # local big ⇒ Wh saved is measured; API big ⇒ ₹ saved is measured
   samples: 3
   conf_temperature: 0.7   # benchmark stays at 0; only the confidence samples are sampled

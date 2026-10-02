@@ -92,12 +92,12 @@ def test_fixture_export_is_valid_and_honest(tmp_path: Path) -> None:
     assert r["sample"] is True
     api = [x for x in r["results"] if x["config"].endswith("/API")]
     assert api and all(x["wh_q"] is None and x["energy_reason"] for x in api)  # never fabricated
-    assert all(p["config"] not in {"mistral-large/API", "claude-sonnet/API"} for p in r["pareto"] if p["axis"] == "energy")
+    assert all(p["config"] not in {"mistral-small/API", "claude-sonnet/API"} for p in r["pareto"] if p["axis"] == "energy")
     decisions = json.loads((tmp_path / "replay.json").read_text(encoding="utf-8"))["decisions"]
     assert all(sum(d["big"] == v["big"] for d in decisions) == 10 for v in r["router"]["variants"])
     sims = {v["big"]: v["sim"] for v in r["router"]["variants"]}
     assert sims["llama3.1-8b/Q8"]["wh_saved_1k"] is not None  # local big model ⇒ energy saving is measured
-    assert sims["mistral-large/API"]["wh_saved_1k"] is None and sims["mistral-large/API"]["wh_reason"]
+    assert sims["mistral-small/API"]["wh_saved_1k"] is None and sims["mistral-small/API"]["wh_reason"]
 
 
 def test_confidence_needs_disagreement() -> None:
@@ -173,3 +173,31 @@ def test_harness_plan_and_job_wiring(tmp_path: Path) -> None:
     bad = run_job(Job(local, task, its[0].model_copy(update={"prompt": "boom"}), 0, "bench", 0.0, 0), S(), meter, "fp")  # type: ignore[arg-type]
     assert bad.error == "TimeoutError: slow" and bad.correct is None  # stored, then retried on resume
     assert load_pricing()  # config files parse
+
+
+def test_api_rate_limit_is_waited_out(monkeypatch: pytest.MonkeyPatch) -> None:
+    from bench.core.schemas import Metrics
+    from bench.runners import api_runner
+
+    monkeypatch.setenv("MISTRAL_API_KEY", "dummy")
+    monkeypatch.setattr(api_runner, "RATE_LIMIT_WAITS_S", (0, 0))
+    monkeypatch.setattr(api_runner, "MIN_INTERVAL_S", {})
+    r = api_runner.ApiRunner("mistral", "mistral-small-latest")
+
+    class Limited(Exception):
+        status_code = 429
+
+    calls = []
+
+    def flaky(*_: object) -> tuple[str, Metrics]:
+        calls.append(1)
+        if len(calls) < 3:
+            raise Limited()
+        return "ok", Metrics(ttft_ms=1, total_ms=2, input_tokens=1, output_tokens=1, tokens_per_sec=None)
+
+    monkeypatch.setattr(r, "_generate", flaky)
+    assert r.generate("p", 1, 0.0, 0)[0] == "ok" and len(calls) == 3  # two 429s waited out
+    calls.clear()
+    monkeypatch.setattr(api_runner, "RATE_LIMIT_WAITS_S", (0,))
+    with pytest.raises(Limited):
+        r.generate("p", 1, 0.0, 0)  # patience exhausted → error row, retried on the next run

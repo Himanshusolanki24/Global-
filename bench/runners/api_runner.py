@@ -10,13 +10,16 @@ import time
 from bench.core.schemas import Backend, Metrics
 from bench.runners.base import Runner
 
-RETRIES = 6  # the SDK backs off on 429, which the Mistral free tier (≈1 request/s) will send
+RETRIES = 2  # SDK retries for 5xx/connection errors; rate limits get the slower loop below
 MISTRAL_URL = "https://api.mistral.ai/v1"
+MIN_INTERVAL_S = {"mistral": 1.2}  # Mistral's free tier allows about one request per second
+RATE_LIMIT_WAITS_S = (5, 10, 20, 40, 60, 60, 60)  # ≈ 4 min of patience before a call is stored as an error
 
 
 class ApiRunner(Runner):
     def __init__(self, backend: Backend, tag: str) -> None:
         self.backend, self.tag = backend, tag
+        self._last = 0.0
         if backend in ("openai", "mistral"):
             from openai import OpenAI
 
@@ -31,6 +34,21 @@ class ApiRunner(Runner):
             raise ValueError(f"ApiRunner cannot serve backend {backend!r}")
 
     def generate(self, prompt: str, max_tokens: int, temperature: float, seed: int) -> tuple[str, Metrics]:
+        """Throttled, and patient on HTTP 429. Waiting is outside the timed call, so TTFT stays honest."""
+        for wait in (*RATE_LIMIT_WAITS_S, None):
+            gap = MIN_INTERVAL_S.get(self.backend, 0) - (time.monotonic() - self._last)
+            if gap > 0:
+                time.sleep(gap)
+            self._last = time.monotonic()
+            try:
+                return self._generate(prompt, max_tokens, temperature, seed)
+            except Exception as e:
+                if wait is None or getattr(e, "status_code", None) != 429:
+                    raise
+                time.sleep(wait)
+        raise AssertionError("unreachable")
+
+    def _generate(self, prompt: str, max_tokens: int, temperature: float, seed: int) -> tuple[str, Metrics]:
         parts: list[str] = []
         ttft: float | None = None
         t0 = time.perf_counter()

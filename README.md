@@ -97,7 +97,7 @@ It then calls `GET {VITE_API_URL}/results`. If the variable is unset, or the bac
                 "acc": 66.6, "acc_ci": [62.3, 71.1], "ttft_p95_ms": 55,
                 "wh_q": 0.0727, "wh_ci": [0.0676, 0.0778], "mwh_tok": 0.808,
                 "inr_1k": 2.21, "co2_g_1k": 52.1 }],
-  "router": { "small": "phi3.5-mini/Q4", "big": "mistral-large/API", "samples": 3,
+  "router": { "small": "phi3.5-mini/Q4", "big": "mistral-small/API", "samples": 3,
               "queries": [{ "id": "Q-001", "task": "classify", "text": "…", "conf": 0.667,
                             "small_ok": true, "big_ok": true }] }
 }

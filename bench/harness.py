@@ -188,13 +188,14 @@ def main(argv: list[str] | None = None) -> None:
     if not meter.available:
         log("warn_no_nvml", note="energy will be stored as unavailable")
 
-    t0, n, errors = time.perf_counter(), 0, 0
+    t0, n, errors, failed = time.perf_counter(), 0, 0, []
     for _, grp in groupby(jobs, key=lambda j: j.config.id):
         group = list(grp)
         try:
             session = Session(group[0].config, store, meter, pricing, a.keep_models)
         except Exception as e:  # noqa: BLE001 — one broken model must not end a 10-hour run
             log("config_failed", config=group[0].config.id, error=f"{type(e).__name__}: {e}"[:500], skipped=len(group))
+            failed.append(group[0].config.id)
             continue
         try:
             for j in group:
@@ -214,9 +215,11 @@ def main(argv: list[str] | None = None) -> None:
                         config=j.config.id, per_call_s=round(el / n, 2), eta_min=round(el / n * (len(jobs) - n) / 60, 1))
         finally:
             session.close()
-    log("finished", calls=n, errors=errors, minutes=round((time.perf_counter() - t0) / 60, 1),
+    log("finished", calls=n, errors=errors, failed_configs=failed, minutes=round((time.perf_counter() - t0) / 60, 1),
         note="errored calls are retried on the next run" if errors else "")
     store.close()
+    if failed and a.limit:  # a smoke run (--limit) must surface a model that cannot run at all
+        raise SystemExit(f"harness: {len(failed)} config(s) could not run: {', '.join(failed)}")
 
 
 if __name__ == "__main__":
