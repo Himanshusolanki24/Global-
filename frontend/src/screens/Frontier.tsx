@@ -50,7 +50,7 @@ export default function Frontier({ bench, lang, task }: ScreenProps) {
       <div className="screen-head">
         <H k="frontierH" lang={lang} className="h-section" />
         <p className="lede">
-          Each point is one configuration on {TASKS[task]} in {lang === 'en' ? 'English' : 'Hindi'}. A thread joins one model as it is quantised, FP16 to Q8 to Q4. The stepped line is the frontier: nothing to its left is more accurate.
+          Each point is one configuration on {TASKS[task]} in {cell(bench, bench.configs[0].id, task, lang).lang === 'en' ? 'English' : 'Hindi'}. A thread joins one model as it is quantised, FP16 to Q8 to Q4. The stepped line is the frontier: nothing to its left is more accurate.
         </p>
       </div>
 

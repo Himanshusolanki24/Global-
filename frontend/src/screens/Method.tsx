@@ -2,12 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import type { ScreenProps } from '../App';
 import { H } from '../ui';
 
-const STEPS = [
-  { h: 'Declare the boundary', f: 'boundary = GPU + CPU + RAM', p: 'Everything inside the dashed box is metered. Anything outside, the monitor or the network, is not claimed.' },
-  { h: 'Measure idle', f: 'P_idle = median P over 120 s, no load', p: 'The machine sits still so its resting draw can be subtracted from every run.' },
-  { h: 'Warm up, then run N queries', f: 'N = 500 per task × language × config', p: 'Twenty discarded warm-up queries first, so caches and clocks settle before anything is counted.' },
-  { h: 'Integrate energy', f: 'E = Σ(P − P_idle)·Δt ÷ N', p: 'Power is sampled every 100 ms across the boundary and integrated, then divided per query.' },
-  { h: 'Score with a confidence interval', f: 'CI₉₅ = bootstrap, 2,000 resamples', p: 'No number leaves the bench without its whisker. Overlapping whiskers are reported as no difference.' },
+/** The protocol as it actually ran, read from results.json where the run records it. */
+const steps = ({ run }: ScreenProps['bench']) => [
+  { h: 'Declare the boundary', f: `boundary = ${run.boundary}`, p: `NVML reads the energy counters of every GPU (${run.host.gpu}). CPU, RAM, monitor and network sit outside the box and are not claimed.` },
+  { h: 'Measure idle', f: `P_idle = mean P over ${run.host.idle_s} s = ${run.host.idle_w.toFixed(1)} ± ${run.host.idle_w_std.toFixed(1)} W`, p: 'Every model is unloaded and the GPUs sit still, so their resting draw can be subtracted from every call.' },
+  { h: 'Warm up, then run N queries', f: `N = ${run.n_per_cell} per task × config · temperature 0`, p: `One discarded warm-up call per model. Identical prompts and max_tokens for every model; a subset runs ${run.repeats}× for timing and energy spread.` },
+  { h: 'Integrate energy', f: 'E = ΔE_counter − P_idle·Δt, per call', p: 'The GPU hardware energy counters are read before and after each call and summed across GPUs. Nothing is interpolated: a call without a reading stays unmeasured.' },
+  { h: 'Score with a confidence interval', f: 'CI₉₅ = bootstrap, 2,000 resamples', p: 'Accuracy is averaged per item, then resampled over items. Differences between models use a paired bootstrap, not whisker overlap.' },
   { h: 'Compare', f: 'EI = Accuracy ÷ Wh per 1k\nCoQ = ΔCost ÷ ΔAccuracy', p: 'Efficiency index ranks configs; cost of quality prices each extra point in ₹ and Wh.' },
 ];
 
@@ -44,7 +45,7 @@ export default function Method({ bench, lang }: ScreenProps) {
       <H k="methodH" lang={lang} className="h-section" />
       <div className="nb-grid">
         <ol className="nb-steps">
-          {STEPS.map((s) => (
+          {steps(bench).map((s) => (
             <li key={s.h}>
               <h3>{s.h}</h3>
               <p className="formula mono">{s.f}</p>
@@ -53,21 +54,25 @@ export default function Method({ bench, lang }: ScreenProps) {
           ))}
         </ol>
         <figure className="boundary">
-          <svg viewBox="0 0 320 300" role="img" aria-label="Measurement boundary: a dashed box around GPU, CPU and RAM; monitor and network sit outside">
+          <svg viewBox="0 0 320 300" role="img" aria-label={`Measurement boundary: ${bench.run.boundary}. Parts drawn dotted are not metered.`}>
             <rect x={20} y={20} width={280} height={190} className="bnd-box" />
-            <text x={28} y={14} className="bnd-label">measurement boundary: {bench.run.boundary}</text>
-            {[['GPU', 40, 50, 120, 70], ['CPU', 180, 50, 100, 70], ['RAM', 40, 140, 240, 44]].map(([n, x, y, w, h]) => (
-              <g key={n}>
-                <rect x={+x} y={+y} width={+w} height={+h} className="bnd-part" />
-                <text x={+x + 10} y={+y + 22} className="bnd-part-label">{n}</text>
-              </g>
-            ))}
+            <text x={28} y={14} className="bnd-label">metered: {bench.run.boundary.split(',')[0]}</text>
+            {[['GPU', 40, 50, 120, 70], ['CPU', 180, 50, 100, 70], ['RAM', 40, 140, 240, 44]].map(([n, x, y, w, h]) => {
+              const inside = bench.run.boundary.includes(String(n)); // only what the run metered is drawn solid
+              return (
+                <g key={n}>
+                  <rect x={+x} y={+y} width={+w} height={+h} className={inside ? 'bnd-part' : 'bnd-out'} />
+                  <text x={+x + 10} y={+y + 22} className={inside ? 'bnd-part-label' : 'bnd-out-label'}>{n}</text>
+                  {!inside && <text x={+x + 10} y={+y + 40} className="bnd-out-label" style={{ fontSize: 11 }}>not metered</text>}
+                </g>
+              );
+            })}
             <rect x={40} y={236} width={110} height={40} className="bnd-out" />
             <text x={50} y={260} className="bnd-out-label">monitor</text>
             <rect x={170} y={236} width={110} height={40} className="bnd-out" />
             <text x={180} y={260} className="bnd-out-label">network</text>
           </svg>
-          <figcaption className="small graphite">{bench.run.hardware}. Outside the box is not counted and not claimed.</figcaption>
+          <figcaption className="small graphite">{bench.run.hardware}. Dotted parts are not metered and not claimed.</figcaption>
         </figure>
       </div>
 

@@ -7,10 +7,10 @@ import { Cropped, Est, H, Odometer, Whisker } from '../ui';
 const NEEDLE = { stiffness: 180, damping: 14 };
 
 // Figures quoted on the landing bench. Verify sources before publishing; see README note.
-const READOUTS = [
+type Readout = { pre: string; v: string; unit: string; label: string; src: string; min: number; max: number; log?: boolean; mark?: number; markLabel?: string };
+const READOUTS: Readout[] = [
   { pre: '', v: '945', unit: 'TWh', label: 'Data-centre electricity demand projected for 2030, about double 2024', src: 'IEA, Energy and AI, 2025', min: 0, max: 1000, mark: 415, markLabel: '2024' },
   { pre: '~', v: '30', unit: '×', label: 'Energy of a reasoning-mode answer against a standard answer to the same prompt', src: 'Hugging Face AI Energy Score, 2025', min: 1, max: 100, log: true },
-  { pre: '', v: '2.4', unit: '×', label: 'Energy counted with a GPU+CPU+RAM boundary against GPU alone, same run', src: 'RightSize pilot, RUN-0412 (sample)', min: 1, max: 3 },
   { pre: '', v: '74', unit: '%', label: 'Best score any model reached on MILU, the Indic multi-domain benchmark', src: 'MILU, AI4Bharat, 2024', min: 0, max: 100, mark: 100, markLabel: 'perfect' },
 ];
 
@@ -21,19 +21,33 @@ export default function Bench({ bench, lang, task }: ScreenProps) {
         <p className="hero-line" lang="en" data-first={lang === 'en'}>Bigger costs something.</p>
         <p className="hero-line deva" lang="hi" data-first={lang === 'hi'}>बड़ा मॉडल, बड़ा बिल।</p>
       </Cropped>
-      <Readouts />
+      <Readouts bench={bench} />
       <SizeDial bench={bench} lang={lang} task={task} />
     </>
   );
 }
 
-function Readouts() {
+/** The bench's own headline, computed from results.json: on Q&A, how much more energy the largest local
+ *  model spends than the cheapest configuration that is at least as accurate. */
+function measuredReadout(bench: ScreenProps['bench']): Readout {
+  const big = bench.configs.at(-1)!, rb = cell(bench, big.id, 'qa', 'en');
+  const best = bench.configs.map((c) => ({ c, r: cell(bench, c.id, 'qa', 'en') })).filter((x) => x.r.acc >= rb.acc).sort((a, b) => a.r.wh_q - b.r.wh_q)[0];
+  const ratio = rb.wh_q / best.r.wh_q;
+  return {
+    pre: '', v: ratio.toFixed(1), unit: '×', min: 1, max: 10,
+    label: `Energy ${shortName(big)} spends per Q&A answer against ${shortName(best.c)}, which scored ${fmt.pct(best.r.acc)} to its ${fmt.pct(rb.acc)}`,
+    src: `RightSize, ${bench.run.id} (measured)`,
+  };
+}
+
+function Readouts({ bench }: { bench: ScreenProps['bench'] }) {
   // Counters start at zero and roll to the quoted figure once, on arrival.
   const [on, setOn] = useState(false);
   useEffect(() => { const id = setTimeout(() => setOn(true), 500); return () => clearTimeout(id); }, []); // after the drawer settles
+  const readouts = useMemo(() => [READOUTS[0], READOUTS[1], measuredReadout(bench), READOUTS[2]], [bench]);
   return (
     <div className="readouts">
-      {READOUTS.map((r) => (
+      {readouts.map((r) => (
         <figure key={r.v} className="readout">
           <div className="readout-value">
             {r.pre}<Odometer value={on ? r.v : r.v.replace(/\d/g, '0')} />

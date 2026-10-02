@@ -17,19 +17,22 @@ export default function Receipt({ bench, lang, task }: ScreenProps) {
   const ca = bench.configs.find((c) => c.id === a)!, cb = bench.configs.find((c) => c.id === b)!;
   const ra = cell(bench, a, task, lang), rb = cell(bench, b, task, lang);
   const q = costOfQuality({ ...ra, c: ca }, { ...rb, c: cb });
+  // Paired bootstrap on per-item ΔAccuracy from the bench; CI overlap only if this pair is not in results.json.
+  const paired = bench.coq.find((p) => p.task === task && p.lo === q.lo.c.id && p.hi === q.hi.c.id);
+  const significant = paired ? paired.significant : q.significant;
   const est = ca.estimated || cb.estimated;
   const e = est ? ' est.' : '';
   const sign = (x: number) => (x >= 0 ? '+' : '−');
 
-  const verdict = !q.significant
-    ? `No clear gain: the CIs overlap. Stay with ${shortName(q.lo.c)}.`
+  const verdict = !significant
+    ? `No clear gain${paired ? ` (paired 95% CI ${paired.d_acc_ci[0]} to ${paired.d_acc_ci[1]} pts includes 0)` : ': the CIs overlap'}. Stay with ${shortName(q.lo.c)}.`
     : `Each extra point costs ${fmt.inr(q.inrPerPt)} per 1k queries. Go bigger only if a wrong answer costs you more.`;
 
   const lines: Line[] = [
     ['RightSize · cost of quality'],
     [`${bench.run.id} · ${bench.run.boundary}`],
     [fmt.when(bench.run.measured_at)],
-    [`${TASKS[task]} · ${lang === 'en' ? 'English' : 'Hindi'} · n=${bench.run.n_per_cell}`],
+    [`${TASKS[task]} · ${ra.lang === 'en' ? 'English' : 'Hindi'} · n=${ra.n_items}`],
     '--',
     [`A  ${shortName(q.lo.c)}`, `${fmt.pct(q.lo.acc)}`],
     ['   ₹ / 1k queries', fmt.inr(q.lo.inr_1k)],
