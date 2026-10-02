@@ -20,9 +20,13 @@ npm-debug.log*
 !.vscode/extensions.json
 .idea/
 
-# python backend (FastAPI + SQLite)
+# python bench (runs on Kaggle; the DB is an artefact, results.json is what ships)
 __pycache__/
 *.py[cod]
 .venv/
 venv/
 *.sqlite3-journal
+*.db
+*.db-wal
+*.db-shm
+.pytest_cache/
