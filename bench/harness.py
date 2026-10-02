@@ -38,7 +38,7 @@ from bench.scoring.registry import score
 
 IST = timezone(timedelta(hours=5, minutes=30))
 RUN_ID = f"RUN-{datetime.now(IST):%Y%m%d-%H%M}-{uuid.uuid4().hex[:4]}"
-API_KEYS = {"openai": "OPENAI_API_KEY", "anthropic": "ANTHROPIC_API_KEY"}
+API_KEYS = {"openai": "OPENAI_API_KEY", "anthropic": "ANTHROPIC_API_KEY", "mistral": "MISTRAL_API_KEY"}
 OFFLOAD_REASON = "model partly offloaded to CPU; the GPU-only meter would undercount"
 
 

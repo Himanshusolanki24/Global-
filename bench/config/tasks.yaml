@@ -1,6 +1,6 @@
 # correct = score >= pass_score. max_tokens is identical for every config on a task.
 # Items are built by `python -m bench.data.build_tasks` (seeded sample of public datasets).
-judge: {backend: openai, tag: gpt-4o-mini}   # summarise only; not a contestant, temperature 0
+judge: {backend: mistral, tag: mistral-small-latest}   # summarise only; not a contestant, temperature 0
 
 tasks:
   - {id: classify,  name: Classify,  lang: en, file: classify_en.jsonl,  scorer: exact_match, max_tokens: 16,  pass_score: 1.0}

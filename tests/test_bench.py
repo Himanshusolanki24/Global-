@@ -92,12 +92,12 @@ def test_fixture_export_is_valid_and_honest(tmp_path: Path) -> None:
     assert r["sample"] is True
     api = [x for x in r["results"] if x["config"].endswith("/API")]
     assert api and all(x["wh_q"] is None and x["energy_reason"] for x in api)  # never fabricated
-    assert all(p["config"] not in {"gpt-4o/API", "claude-sonnet/API"} for p in r["pareto"] if p["axis"] == "energy")
+    assert all(p["config"] not in {"mistral-large/API", "claude-sonnet/API"} for p in r["pareto"] if p["axis"] == "energy")
     decisions = json.loads((tmp_path / "replay.json").read_text(encoding="utf-8"))["decisions"]
     assert all(sum(d["big"] == v["big"] for d in decisions) == 10 for v in r["router"]["variants"])
     sims = {v["big"]: v["sim"] for v in r["router"]["variants"]}
     assert sims["llama3.1-8b/Q8"]["wh_saved_1k"] is not None  # local big model ⇒ energy saving is measured
-    assert sims["gpt-4o/API"]["wh_saved_1k"] is None and sims["gpt-4o/API"]["wh_reason"]
+    assert sims["mistral-large/API"]["wh_saved_1k"] is None and sims["mistral-large/API"]["wh_reason"]
 
 
 def test_confidence_needs_disagreement() -> None:

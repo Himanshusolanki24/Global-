@@ -97,7 +97,7 @@ It then calls `GET {VITE_API_URL}/results`. If the variable is unset, or the bac
                 "acc": 66.6, "acc_ci": [62.3, 71.1], "ttft_p95_ms": 55,
                 "wh_q": 0.0727, "wh_ci": [0.0676, 0.0778], "mwh_tok": 0.808,
                 "inr_1k": 2.21, "co2_g_1k": 52.1 }],
-  "router": { "small": "phi3.5-mini/Q4", "big": "gpt-4o/API", "samples": 3,
+  "router": { "small": "phi3.5-mini/Q4", "big": "mistral-large/API", "samples": 3,
               "queries": [{ "id": "Q-001", "task": "classify", "text": "…", "conf": 0.667,
                             "small_ok": true, "big_ok": true }] }
 }
@@ -113,7 +113,7 @@ All compute runs in one Kaggle notebook, `notebook/rightsize_bench.ipynb`. Its o
 
 1. **New notebook** on kaggle.com → File → Import → `notebook/rightsize_bench.ipynb` from this repo.
 2. **Settings:** Accelerator **GPU T4 x2**, Internet **on**. (Two GPUs let Llama 3.1 8B FP16 sit fully in VRAM, and energy is read from both.)
-3. **Secrets** (Add-ons → Secrets): `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `HF_TOKEN`. Accept the [MILU](https://huggingface.co/datasets/ai4bharat/MILU) terms first; it is gated.
+3. **Secrets** (Add-ons → Secrets): `MISTRAL_API_KEY` (free Experiment plan works), `HF_TOKEN`; `ANTHROPIC_API_KEY` only for a full run. Accept the [MILU](https://huggingface.co/datasets/ai4bharat/MILU) terms first; it is gated.
 4. **Save Version → Save & Run All.** The cells run in order:
 
 | Cell | Does |

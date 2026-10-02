@@ -4,21 +4,25 @@ it is stored as an error row and retried on the next harness run."""
 
 from __future__ import annotations
 
+import os
 import time
 
 from bench.core.schemas import Backend, Metrics
 from bench.runners.base import Runner
 
-RETRIES = 6
+RETRIES = 6  # the SDK backs off on 429, which the Mistral free tier (≈1 request/s) will send
+MISTRAL_URL = "https://api.mistral.ai/v1"
 
 
 class ApiRunner(Runner):
     def __init__(self, backend: Backend, tag: str) -> None:
         self.backend, self.tag = backend, tag
-        if backend == "openai":
+        if backend in ("openai", "mistral"):
             from openai import OpenAI
 
-            self.client = OpenAI(max_retries=RETRIES, timeout=120)
+            # Mistral's chat API is OpenAI-compatible; only the URL, key and two parameter names differ.
+            self.client = (OpenAI(max_retries=RETRIES, timeout=120) if backend == "openai" else
+                           OpenAI(base_url=MISTRAL_URL, api_key=os.environ.get("MISTRAL_API_KEY"), max_retries=RETRIES, timeout=120))
         elif backend == "anthropic":
             from anthropic import Anthropic
 
@@ -38,18 +42,20 @@ class ApiRunner(Runner):
                     ttft = (time.perf_counter() - t0) * 1000
                 parts.append(piece)
 
-        if self.backend == "openai":
+        if self.backend in ("openai", "mistral"):
             usage = None
+            extra = ({"seed": seed, "stream_options": {"include_usage": True}} if self.backend == "openai"
+                     else {"extra_body": {"random_seed": seed}})  # Mistral sends usage on its last chunk by default
             for chunk in self.client.chat.completions.create(
                 model=self.tag, messages=[{"role": "user", "content": prompt}], max_tokens=max_tokens,
-                temperature=temperature, seed=seed, stream=True, stream_options={"include_usage": True},
+                temperature=temperature, stream=True, **extra,
             ):
                 if chunk.choices:
                     mark(chunk.choices[0].delta.content)
                 if chunk.usage:
                     usage = chunk.usage
             if usage is None:
-                raise RuntimeError("openai: stream ended without a usage object")
+                raise RuntimeError(f"{self.backend}: stream ended without a usage object")
             in_tok, out_tok = usage.prompt_tokens, usage.completion_tokens
         else:
             with self.client.messages.stream(

@@ -23,7 +23,7 @@ TASKS_DIR = BENCH_DIR / "data" / "tasks"
 
 Lang = Literal["en", "hi"]
 Quant = Literal["Q4", "Q8", "FP16", "API"]
-Backend = Literal["ollama", "openai", "anthropic"]
+Backend = Literal["ollama", "openai", "anthropic", "mistral"]
 EnergySource = Literal["nvml", "unavailable"]
 CI = tuple[float, float]
 

@@ -24,7 +24,7 @@ REPEATS = 3
 RUN_ID = "RUN-SAMPLE"
 
 QUALITY = {"qwen2.5-0.5b": 0.40, "llama3.2-1b": 0.50, "gemma2-2b": 0.61, "phi3.5-mini": 0.69,
-           "llama3.1-8b": 0.76, "gpt-4o": 0.87, "claude-sonnet": 0.89}
+           "llama3.1-8b": 0.76, "mistral-large": 0.85, "claude-sonnet": 0.89}
 QUANT = {"Q4": (-0.028, 0.55, 0.70, 0.62), "Q8": (-0.006, 0.72, 0.80, 1.10), "FP16": (0.0, 1.0, 1.0, 2.05)}  # Δq, energy, latency, GB per B params
 TASK = {"classify": (0.13, 0.4, 8, 1.0), "extract": (0.05, 0.8, 60, 1.3), "summarise": (0.03, 1.6, 140, 1.8),
         "qa": (0.0, 1.0, 90, 1.0), "math": (-0.10, 1.8, 180, 1.0), "hindi_qa": (-0.06, 1.2, 100, 1.1)}  # Δq, energy, out tokens, prompt
@@ -68,7 +68,7 @@ def populate(store: Store) -> None:
                         wh: float | None = (0.012 + 0.03 * p) * e_q * t_e * hi * jit
                         cost = local_cost_inr(wh, pricing.tariff_inr_per_kwh)
                     else:
-                        ttft = (620 if c.model == "gpt-4o" else 780) * t_prompt * jit
+                        ttft = (540 if c.model == "mistral-large" else 780) * t_prompt * jit
                         tps = 80 * jit
                         wh = None
                         cost = api_cost_inr(in_tok, out_tok, pricing.api[c.tag], pricing.usd_inr)
