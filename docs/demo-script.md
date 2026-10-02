@@ -3,7 +3,7 @@
 Video: `RightSize-demo.mp4` · 4:51 · 1920×1080 · silent track, ready for your voice.  
 Data: run `RUN-20261002-2218-c492` on 2× Tesla T4 32.2 GB + Intel(R) Xeon(R) CPU @ 2.00GHz · 30 questions per task.
 
-**How to record:** play the video, read each block when its timestamp appears. Pace is about 2.3 words per second; every block fits inside its scene with a breath to spare. Numbers are spoken in words so they are easy to read aloud.
+**How to record:** play the video, read each block when its timestamp appears. Pace is about 2.5 words per second (150 a minute); every block fits inside its scene with a breath to spare. Numbers are spoken in words so they are easy to read aloud.
 
 | Time | Scene | Say this |
 |---|---|---|
