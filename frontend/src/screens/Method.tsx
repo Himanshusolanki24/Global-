@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import type { ScreenProps } from '../App';
 import { H } from '../ui';
 
@@ -23,6 +24,21 @@ const ROWS: [string, Mark[]][] = [
 ];
 
 export default function Method({ bench, lang }: ScreenProps) {
+  const matrix = useRef<HTMLTableElement>(null);
+  const [go, setGo] = useState(false);
+  useEffect(() => {
+    const el = matrix.current;
+    if (!el) return;
+    const io = new IntersectionObserver(([e]) => {
+      if (e.isIntersecting) {
+        setGo(true);
+        io.disconnect();
+      }
+    }, { threshold: 0.3 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
   return (
     <div className="screen notebook">
       <H k="methodH" lang={lang} className="h-section" />
@@ -56,7 +72,7 @@ export default function Method({ bench, lang }: ScreenProps) {
       </div>
 
       <H k="priorH" lang={lang} className="h-section" />
-      <table className="matrix">
+      <table ref={matrix} className={`matrix ${go ? 'go' : ''}`}>
         <thead><tr><th />{COLS.map((c) => <th key={c} scope="col">{c}</th>)}</tr></thead>
         <tbody>
           {ROWS.map(([row, marks], r) => (

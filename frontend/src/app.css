@@ -113,9 +113,18 @@ main { max-width: 1440px; margin: 0 auto; padding: var(--s-8) var(--gutter) var(
 .crop.bl { bottom: -8px; left: -8px; border-width: 0 0 1px 1px; }
 .crop.br { bottom: -8px; right: -8px; border-width: 0 1px 1px 0; }
 
-.plot { stroke-dasharray: 1; stroke-dashoffset: 1; animation: pen var(--dur-signature) var(--ease-instrument) forwards; }
+/* Rest state is the drawn line; the animation only hides it while it waits (backwards fill).
+   A paused, throttled or skipped animation therefore still shows the mark. */
+.plot { stroke-dasharray: 1; animation: pen var(--dur-signature) var(--ease-instrument) backwards; }
 .plot-slow { animation-duration: 1400ms; }
-@keyframes pen { to { stroke-dashoffset: 0; } }
+@keyframes pen {
+  from { stroke-dashoffset: 1; stroke-opacity: 0; } /* opacity hides the round cap's dot at length 0 */
+  1% { stroke-opacity: 1; }
+  to { stroke-dashoffset: 0; }
+}
+/* The matrix only animates once it is on screen; until then (or if that never happens) marks sit drawn. */
+.matrix .plot { animation-name: none; }
+.matrix.go .plot { animation-name: pen; }
 
 .calibrating { display: grid; gap: var(--s-2); justify-items: start; padding: var(--s-12) 0; }
 .calibrating-ticks { display: flex; align-items: flex-end; gap: 5px; height: 20px; }
