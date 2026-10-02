@@ -1,0 +1,11 @@
+# correct = score >= pass_score. max_tokens is identical for every config on a task.
+# Items are built by `python -m bench.data.build_tasks` (seeded sample of public datasets).
+judge: {backend: openai, tag: gpt-4o-mini}   # summarise only; not a contestant, temperature 0
+
+tasks:
+  - {id: classify,  name: Classify,  lang: en, file: classify_en.jsonl,  scorer: exact_match, max_tokens: 16,  pass_score: 1.0}
+  - {id: extract,   name: Extract,   lang: en, file: extract_en.jsonl,   scorer: token_f1,    max_tokens: 96,  pass_score: 0.8}
+  - {id: summarise, name: Summarise, lang: en, file: summarise_en.jsonl, scorer: llm_judge,   max_tokens: 128, pass_score: 0.75}
+  - {id: qa,        name: Q&A,       lang: en, file: qa_en.jsonl,        scorer: token_f1,    max_tokens: 48,  pass_score: 0.5}
+  - {id: math,      name: Math,      lang: en, file: math_en.jsonl,      scorer: exact_match, max_tokens: 384, pass_score: 1.0}
+  - {id: hindi_qa,  name: Hindi Q&A, lang: hi, file: qa_hi.jsonl,        scorer: exact_match, max_tokens: 16,  pass_score: 1.0}

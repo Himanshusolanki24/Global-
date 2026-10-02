@@ -1,0 +1,21 @@
+# Inputs, not measurements. Re-check every value on the run date; results.json records what was used.
+tariff_inr_per_kwh: 8.5
+grid_g_per_wh: 0.716               # = kg CO2/kWh
+grid_source: CEA CO₂ Baseline Database
+usd_inr: 88.0
+
+# USD per 1M tokens, provider list price. Keyed by API model id (models.yaml `tag`).
+api:
+  gpt-4o: {in_usd_per_m: 2.50, out_usd_per_m: 10.00}
+  claude-sonnet-5-5: {in_usd_per_m: 3.00, out_usd_per_m: 15.00}
+
+# Published provider figures. Shown in the UI tagged "est."; NEVER enter any computed aggregate.
+external_energy_estimates:
+  - config: gpt-4o/API
+    wh_q: 0.34
+    source: "OpenAI (S. Altman, 'The Gentle Singularity', Jun 2025)"
+    note: average ChatGPT query, not task-specific
+  - config: claude-sonnet/API
+    wh_q: null
+    source: null
+    note: no provider disclosure
